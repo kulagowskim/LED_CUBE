@@ -1,136 +1,218 @@
-<html>
-	<head>
-		<title>My first three.js app</title>
-		<style>
-			body { margin: 0; }
-			canvas { width: 100%; height: 100% }
-		</style>
-	</head>
-	<body>
-		<div id="container"></div>
-		<script src="three.js"></script>
-		<script src="OrbitControls.js"></script>
-		<script src="stats.min.js"></script>
+<!doctype html>  
+  <html lang="pl"> 
 
-		<script>
-			var stats;
+  <head>
+    <title>Praca inżynierska</title> 
+    <script src="/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>   
+    <script src="/three.js"></script>
+    <script src="/animate.js"></script>
+    <script src="/OrbitControls.js"></script>
+    <link href="/bootstrap.css" rel="stylesheet">
+  </head>
 
-			var camera, controls, scene, renderer;
-			init();
-			render(); // remove when using next line for animation loop (requestAnimationFrame)
-			//animate();
-			function init() {
-				scene = new THREE.Scene();
-				scene.background = new THREE.Color( 0xcccccc );
-				scene.fog = new THREE.FogExp2( 0xcccccc, 0.002 );
-				renderer = new THREE.WebGLRenderer();
-				renderer.setPixelRatio( window.devicePixelRatio );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				var container = document.getElementById( 'container' );
-				container.appendChild( renderer.domElement );
-				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1000 );
-				camera.position.x = -80;
-				camera.position.y = 180;
-				camera.position.z = 70;
-				controls = new THREE.OrbitControls( camera, renderer.domElement );
-				controls.addEventListener( 'change', render ); // remove when using animation loop
-					// enable animation loop when using damping or autorotation
-					//controls.enableDamping = true;
-					//controls.dampingFactor = 0.25;
-				controls.enableZoom = true;
-					// world
-				var geometry = new THREE.SphereGeometry( 5, 32, 32 );
+  <body>
+    <div style="width: 25%; float:left; margin:50px;">
+      <h2>ANIMACJA</h2>
+      <p><button id="ledSet" class="btn btn-primary">Rozpocznij animację</button></p>
+      <p><button id="stopMonitor" class="btn btn-danger">Zatrzymaj animację / Wyczyść kostkę</button></p>
+      <a class="btn btn-info" href="./pomoc/index.html">Wygeneruj animację</a>
 
-				function renderLed(posX, posY, posZ) {
-					var ledOff = new THREE.MeshPhongMaterial( { color: 0x000 } );
-					var mesh = new THREE.Mesh( geometry, ledOff );
-					mesh.position.x = posX;
-					mesh.position.y = posY;
-					mesh.position.z = posZ;
-					mesh.updateMatrix();
-					mesh.matrixAutoUpdate = false;
-					scene.add( mesh );
-					render();
-					return mesh;
-				};
-				arrX = [];
-				for(x=1;x<5;x++) {
-					for(y=1;y<5;y++) {
-						for(z=1;z<5;z++) {
-							arrX.push(renderLed(x*20,y*20,z*20));
-						}
-					}
-				}
-				
-				arrX[1].material.color.setHex( 0xff0000 );
+      <h2 style="margin-top:100px;">ZUŻYCIE PROCESORA</h2>
+      <div class="rangeslider"> 
+        <p>Częstotliwość odświeżania zużycia procesora (ms): </p>
+        <input type="range" min="500" max="5000" value="1000" step="100" class="myslider" id="slider" style="width:500px"> 
+        <p>Wartość: <span id="slider_val"></span></p> 
+      </div> 
+      <p><button id="CPUUsage" class="btn btn-primary">Pokaż zużycie procesora</button></p>
+      <p><button id="stop" class="btn btn-danger">Zatrzymaj</button></p>
 
-				const animations2 = [
-				    0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
-				    0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
-				    0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
-				    0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0
-				];
+      <h3 style="margin-top:50px;">Ilość świecących diod</h2>
+      <div id="ledsON">     0    </div>
+      <h3 style="margin-top:50px;">Procent zużycia procesora</h2>
+      <div id="CPU">     0    </div>
+    </div>
+    <div style="width: 60%; float:left; margin:50px;">
+       <div id="container" style="width: 1200px; height: 600px"></div>
+    </div>
 
-				const animations = [
-				    1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-				    1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-				    1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-				    1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0
-				];
+    <script>
 
-				const tab = [animations2, animations];
+      var slider = document.getElementById("slider"); 
+      var output = document.getElementById("slider_val");
+      var timeouts = []; 
+      output.innerHTML = slider.value; 
+      var camera, controls, scene, renderer;
+      var arrX = [];
+      var tab = [];
+      init();
 
-				function changeColor(argument, n) {
-					if(n > tab.length) {
-						return;
-					}
+      function slider_value() {
+        var slider_val=slider.value;
+        slider_val = parseInt(slider_val, 10);
 
-					for(i=0 ; i <= arrX.length ; i++) {
-						if(argument[i] === 1) {
-							arrX[i].material.color.setHex( 0xff0000 );
-							arrX[i].material.needsUpdate = true;
-						} else if(argument[i] === 0) {
-							arrX[i].material.color.setHex( 0x000000 );
-							arrX[i].material.needsUpdate = true;
-						}
-						render();
-					}
-					setTimeout(() => changeColor(tab[n], n+1), 2000);
-				}
-				changeColor(tab[0], 1);
-				
-				// lights
-				var light = new THREE.DirectionalLight( 0xffffff );
-				light.position.set( 1, 1, 1 );
-				scene.add( light );
-				var light = new THREE.DirectionalLight( 0x002288 );
-				light.position.set( -1, -1, -1 );
-				scene.add( light );
-				var light = new THREE.AmbientLight( 0x222222 );
-				scene.add( light );
-				//
-				stats = new Stats();
-				container.appendChild( stats.dom );
-				//
-				window.addEventListener( 'resize', onWindowResize, false );
-			}
+        return slider_val;
+      }
 
-			function onWindowResize() {
-				camera.aspect = window.innerWidth / window.innerHeight;
-				camera.updateProjectionMatrix();
-				renderer.setSize( window.innerWidth, window.innerHeight );
-			}
+      slider.oninput = function() { 
+        output.innerHTML = this.value; 
+      }
 
-			function animate() {
-				requestAnimationFrame( animate );
-				controls.update(); // required if controls.enableDamping = true, or if controls.autoRotate = true
-				stats.update();
-				render();
-			}
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 1000 );
+        renderer = new THREE.WebGLRenderer();
 
-			function render() {
-				renderer.render( scene, camera );
-			}
-		</script>
-	</body>
-</html>
+        camera.position.x = -120;
+        camera.position.y = 80;
+        camera.position.z = -250;
+
+        scene.background = new THREE.Color( 0xcccccc );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        var container = document.getElementById( 'container' );
+        renderer.setSize($(container).width(), $(container).height());
+        container.appendChild( renderer.domElement );
+        controls = new THREE.OrbitControls( camera, renderer.domElement );
+        controls.addEventListener( 'change', render );
+        controls.enableZoom = true;
+        var geometry = new THREE.SphereGeometry( 5, 32, 32 );
+
+
+        function renderLed(posX, posY, posZ) {
+          var ledOff = new THREE.MeshPhongMaterial( { color: 0xD4C5C5 } );
+          var mesh = new THREE.Mesh( geometry, ledOff );
+          mesh.position.x = posX;
+          mesh.position.y = posY;
+          mesh.position.z = posZ;
+          scene.add( mesh );
+          return mesh;
+        };
+
+        for(x=5;x>1;x--) {
+          for(y=5;y>1;y--) {
+            for(z=1;z<5;z++) {
+              arrX.push(renderLed((y*20)-70, (x*20)-70 , (z*20)-70));
+            }
+          }
+        }
+
+        // lights
+        var light = new THREE.DirectionalLight( 0xffffff );
+        light.position.set( 1, 1, 1 );
+        scene.add( light );
+        var light = new THREE.DirectionalLight( 0x002288 );
+        light.position.set( -1, -1, -1 );
+        scene.add( light );
+        var light = new THREE.AmbientLight( 0x404040 );
+        scene.add( light );
+        window.addEventListener( 'resize', onWindowResize, false );
+        render();
+      }
+
+      function clearCube() {
+        for (var j = 0; j <= 64; j++) {
+          arrX[j].material.color.setHex( 0xD4C5C5 );
+          arrX[j].material.needsUpdate = true;
+
+          render();
+        }
+      }
+
+      tab = getData();
+      time = getData().time;
+
+      function changeColor(arrX, argument, n, tab) {
+        if(n > tab.length) {
+          return;
+        }
+
+        for(i=0 ; i <= arrX.length ; i++) {
+          if(argument[i] === 1) {
+            arrX[i].material.color.setHex( 0xff0000 );
+            arrX[i].material.needsUpdate = true;
+          } else if(argument[i] === 0) {
+            arrX[i].material.color.setHex( 0xD4C5C5 );
+            arrX[i].material.needsUpdate = true;
+          }
+          render();
+        }
+
+        timeouts.push(setTimeout(() => changeColor(arrX, tab[n], n+1, tab), time[n]));
+      }
+
+      function changeColorCPU(arrX, argument) {
+        for(i=0 ; i <= arrX.length ; i++) {
+          if(argument[i] === 1) {
+            arrX[i].material.color.setHex( 0xff0000 );
+            arrX[i].material.needsUpdate = true;
+          } else if(argument[i] === 0) {
+            arrX[i].material.color.setHex( 0xD4C5C5 );
+            arrX[i].material.needsUpdate = true;
+          }
+          render();
+        }
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+      }
+
+      function render() {
+        renderer.render( scene, camera );
+      }
+
+      var socket = io.connect('http://localhost:4200');
+      socket.on('connect', function(data) {
+        socket.emit('join', 'Połączono z klientem');
+      });
+
+      socket.on('CPUmonitor', function(data){
+
+        var leds_on = Math.round(data*64, 0);
+        var arr = [];
+
+        document.getElementById("ledsON").innerHTML = leds_on;
+        document.getElementById("CPU").innerHTML = Math.round(data*100);
+
+        for(var j = 1; j <= 64; j++) {
+          if(leds_on < j) {
+              arr.push(0);
+          } else {
+              arr.push(1);
+          }
+        }
+
+         changeColorCPU(arrX, arr);
+      });
+
+      $('#ledSet').on('click',function(){
+        socket.emit('getData', getData());
+        socket.emit('led');
+        changeColor(arrX, tab.animation[0], 1, tab.animation)
+      });
+
+      $('#CPUUsage').on('click',function(){
+        socket.emit('CPU', slider_value());
+      });
+
+      $('#stop').on('click',function(){
+        document.getElementById("ledsON").innerHTML = '0';
+        document.getElementById("CPU").innerHTML = '0';
+
+        socket.emit('stop');
+        clearCube();
+      });
+
+      $('#stopMonitor').on('click',function(){
+        socket.emit('stop');
+        for(var i = 0 ; i < timeouts.length ; i++ ) {
+          clearTimeout(timeouts[i]);
+        }
+        timeouts = [];
+        clearCube();
+      });
+    </script>         
+  </body>
+</html>  

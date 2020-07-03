@@ -1,19 +1,17 @@
 {
-  "name": "node-arduino-test",
-  "version": "0.0.1",
-  "description": "Testing node, web sockets, johnny-five, arduino",
-  "main": "webtest.js",
-  "dependencies": {
-    "express": "^4.15.2",
-    "johnny-five": "~0.7.28",
-    "socket.io": "~0.9.16"
-  },
-  "devDependencies": {
-    "eslint-config-rallycoding": "^3.1.0"
-  },
+  "name": "projekt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "MIT"
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.4",
+    "johnny-five": "^1.0.0",
+    "os-utils": "0.0.14",
+    "socket.io": "^2.2.0"
+  }
 }

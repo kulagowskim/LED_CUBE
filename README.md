@@ -1,2 +1,0 @@
-"# LED-CUBE" 
-# LED-CUBE
